@@ -1,0 +1,77 @@
+<?php
+// $Id$
+/**
+ *@file
+ * Module for working with Unicode Unihan character database
+ */
+function unihan_menu() {
+    $items['unihan/convert/%'] = array(
+    'title' => 'Pinyin Conversion',
+    'page callback' => 'unihan_convert_page',
+    'page arguments' => array(2),
+    'access callback' => TRUE,
+  );
+  return $items;
+}
+
+function unihan_xmlrpc() {
+    return array(
+        'unihan.name' => 'unihan_word2pinyin',
+    );
+}
+
+function unihan_convert_page($code) {
+  global $base_url;
+  $result = xmlrpc("$base_url/xmlrpc.php", 'unihan.name', $code);
+  $output .= "<pre>".print_r($result, TRUE)."</pre>";
+  return $output;
+}
+
+function unihan_word2pinyin($str) {
+    $pinyin = "";
+    $len = drupal_strlen($str);
+    for ($i=0; $i<$len; $i++) {
+        $ret = unihan_char2pinyin(drupal_substr($str, $i, 1));
+        if ($ret) {
+            $pinyin .= $ret;
+        }
+        else {
+            $pinyin .= $str[$i];
+        }
+    }
+    return array('pinyin' => $pinyin);
+}
+
+function unihan_char2pinyin($char) {
+    $result = db_query("SELECT kMandarin FROM {unihan} WHERE code='%s'", $char);
+    $result = db_fetch_object($result);
+    if (!$result || is_null($result->kMandarin)) {
+        return NULL;
+    }
+    list($pinyin, $alternatives) = explode(" ", $result->kMandarin, 2);    // only consider most popular romanisation
+    $tone = substr($pinyin, -1);
+    $pinyin = strtolower(substr($pinyin, 0, -1));
+    $translate = array(
+        'a' => array(1 => 'ā', 2 => 'á', 3 => 'ǎ', 4 => 'à', 5 => 'a'),
+        'e' => array(1 => 'ē', 2 => 'é', 3 => 'ě', 4 => 'è', 5 => 'e'),
+        'i' => array(1 => 'ī', 2 => 'í', 3 => 'ǐ', 4 => 'ì', 5 => 'i'),
+        'o' => array(1 => 'ō', 2 => 'ó', 3 => 'ǒ', 4 => 'ò', 5 => 'o'),
+        'u' => array(1 => 'ū', 2 => 'ú', 3 => 'ǔ', 4 => 'ù', 5 => 'u'),
+        'ü' => array(1 => 'ǖ', 2 => 'ǘ', 3 => 'ǚ', 4 => 'ǜ', 5 => 'ü'),
+    );
+    if (strpos ($pinyin, 'a')) {
+        $pinyin = str_replace('a', $translate['a'][$tone], $pinyin);    // if there's an 'a' then it takes the tone mark
+    }
+    else if (strpos ($pinyin, 'e')) {
+        $pinyin = str_replace('e', $translate['e'][$tone], $pinyin);    // likewise if there's an 'e' then it takes the tone mark
+    }
+    else if (strpos ($pinyin, 'ou')) {
+        $pinyin = str_replace('o', $translate['o'][$tone], $pinyin);    // if there's an 'ou' then the 'o' takes the tone mark
+    }
+    else {
+        preg_match('/([aeiouü])[^aeiouü]*$/', $pinyin, $matches);    // otherwise the final vowel takes the tone mark
+        $last_vowel = $matches[1];
+        $pinyin = str_replace($last_vowel, $translate[$last_vowel][$tone], $pinyin);
+    }
+    return $pinyin;
+}
