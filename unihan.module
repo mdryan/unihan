@@ -4,35 +4,35 @@
  *@file
  * Module for working with Unicode Unihan character database
  */
+
 function unihan_menu() {
   return array(
-    'unihan' => array(
-      'title' => 'Pinyin Conversion',
-      'page callback' => 'drupal_get_form',
-      'page arguments' => array('unihan_form'),
-      'access callback' => TRUE,
+    'admin/settings/unihan' => array(
+      'title' => 'Unihan tools',
+      'file' => 'unihan.admin.inc',
+      'page callback' => 'unihan_admin',
+      'access arguments' => array('access administration pages'),
+    ),
+    'admin/settings/unihan/import' => array(
+      'title' => 'Import data',
+      'file' => 'unihan.admin.inc',
+      'page callback' => 'unihan_admin_import',
+      'access arguments' => array('access administration pages'),
     ),
   );
 }
 
+function unihan_init() {
+  if (user_perm('access administration pages') && !variable_get('unihan_imported', FALSE) && $_GET['q'] != 'admin/settings/unihan/import') {
+    drupal_set_message(t('The Unihan database has not yet been imported. Visit !url to resolve.',
+      array('!url' => l('admin/settings/unihan/import', 'admin/settings/unihan/import'))));
+  }
+}
+
 function unihan_xmlrpc() {
   return array(
-    'unihan.name' => 'unihan_word2pinyin',
+    'unihan.pinyin' => 'unihan_word2pinyin',
   );
-}
-
-function unihan_form($form_state) {
-  return array(
-    'convert' => array('#type' => 'textfield', '#title' => t('Chinese characters')),
-    'submit' => array('#type' => 'submit', '#value' => t('Convert')),
-  );
-}
-
-function unihan_form_submit($form, &$form_state) {
-  global $base_url;
-  $convert = $form_state['values']['convert'];
-  $result = xmlrpc("$base_url/xmlrpc.php", 'unihan.name', $convert);
-  drupal_set_message('<pre>' . print_r($result, TRUE) . '</pre>');
 }
 
 function unihan_convert_raw($code) {
@@ -41,11 +41,12 @@ function unihan_convert_raw($code) {
   exit;
 }
 
-function unihan_word2pinyin($str) {
+
+function unihan_word2pinyin($str, $tone_marks = TRUE) {
     $pinyin = "";
     $len = drupal_strlen($str);
     for ($i=0; $i<$len; $i++) {
-        $ret = unihan_char2pinyin(drupal_substr($str, $i, 1));
+        $ret = unihan_char2pinyin(drupal_substr($str, $i, 1), $tone_marks);
         if ($ret) {
             $pinyin .= $ret;
         }
@@ -56,7 +57,8 @@ function unihan_word2pinyin($str) {
     return array('pinyin' => ucfirst($pinyin));
 }
 
-function unihan_char2pinyin($char) {
+
+function unihan_char2pinyin($char, $tone_marks) {
     $result = db_query("SELECT kMandarin FROM {unihan} WHERE code='%s'", $char);
     $result = db_fetch_object($result);
     if (!$result || is_null($result->kMandarin)) {
@@ -65,6 +67,9 @@ function unihan_char2pinyin($char) {
     list($pinyin, $alternatives) = explode(" ", $result->kMandarin, 2);    // only consider most popular romanisation
     $tone = substr($pinyin, -1);
     $pinyin = strtolower(substr($pinyin, 0, -1));
+    if (!$tone_marks) {
+      return($pinyin);
+    }
     $translate = array(
         'a' => array(1 => 'ā', 2 => 'á', 3 => 'ǎ', 4 => 'à', 5 => 'a'),
         'e' => array(1 => 'ē', 2 => 'é', 3 => 'ě', 4 => 'è', 5 => 'e'),
@@ -83,7 +88,7 @@ function unihan_char2pinyin($char) {
         $pinyin = str_replace('o', $translate['o'][$tone], $pinyin);    // if there's an 'ou' then the 'o' takes the tone mark
     }
     else {
-        preg_match('/([aeiouü])[^aeiouü]*$/', $pinyin, $matches);    // otherwise the final vowel takes the tone mark
+        preg_match('/([aeiouü])[^aeiouü]*$/', $pinyin, $matches);       // otherwise the final vowel takes the tone mark
         $last_vowel = $matches[1];
         $pinyin = str_replace($last_vowel, $translate[$last_vowel][$tone], $pinyin);
     }

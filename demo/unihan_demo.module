@@ -1,0 +1,23 @@
+<?php
+function unihan_demo_menu() {
+  return array(
+    'unihan' => array(
+      'title' => 'Unihan tools',
+      'page callback' => 'unihan_demo_page',
+      'file' => 'unihan_demo.inc',
+      'access arguments' => array('access unihan demonstration')
+    ),
+    'unihan/pinyin' => array(
+      'title' => 'Pinyin Conversion',
+      'page callback' => 'drupal_get_form',
+      'file' => 'unihan_demo.inc',
+      'page arguments' => array('unihan_demo_pinyin_form'),
+      'access arguments' => array('access unihan demonstration'),
+    ),
+  );
+}
+
+function unihan_demo_perm() {
+  return array('access unihan demonstration');
+}
+

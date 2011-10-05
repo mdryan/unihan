@@ -5,14 +5,6 @@
  *Install file for unihan module
  *
  */
-function unihan_install() {
-  drupal_install_schema('unihan');
-  unihan_import_data();
-}
-
-function unihan_uninstall() {
-  drupal_uninstall_schema('unihan');
-}
 
 function unihan_schema() {
   $schema['unihan'] = array(
@@ -100,113 +92,17 @@ function unihan_schema() {
       'kVietnamese' => array('type' => 'varchar', 'length' => 255, 'description' => 'The character\'s pronunciation(s) in Quốc ngữ'),
       'kXerox' => array('type' => 'varchar', 'length' => 32, 'description' => 'The Xerox code for this character'),
       'kZVariant' => array('type' => 'varchar', 'length' => 32, 'description' => 'The Unicode value(s) for known z-variants of this character'),
-    ),
+  ),
     'primary key' => array('code'),
   );
   return $schema;
 }
 
-function unihan_import_data() {
-  $batch = array(
-    'title' => t('Importing unihan.txt'),
-    'operations' => array(),
-    'init_message' => t('Starting'),
-    'progress_message' => t('Importing batch @current of @total.'),
-    'error_message' => t('An error occurred during import'),
-    'finished' => 'unihan_import_finished',
-    'file' => drupal_get_path('module', 'unihan').'unihan.install',
-  );
-  $file = drupal_get_path('module', 'unihan').'/unihan.txt';
-  if (!$fh = fopen($file, 'r')) {
-    drupal_set_message(t('Unable to open unihan.txt, please check your installation and reinstall module.'));
-    return;
-  }
-  fgets($fh); // throw away first line (always a comment and maybe BOM)
-  $lines = 0;
-  $pos = ftell($fh);
-  $batch['operations'][] = array('unihan_import_from', $pos);
-  while (!feof($fh)) {
-    fgets($fh);
-    $lines++;
-    if (! ($lines % 500)) {
-      $pos = ftell($fh);
-      $batch['operations'][] = array('unihan_import_from', array($pos));
-    }
-  }
-  $pos = ftell($fh);
-  $batch['operations'][] = array('unihan_import_from', $pos);
-  fclose($fh);
-  batch_set($batch);
+function unihan_install() {
+  drupal_install_schema('unihan');
 }
 
-function unihan_import_from($pos, &$context) {
-  $context['message'] = t('Importing at byte !pos', array('!pos' => $pos));
-  $file = drupal_get_path('module', 'unihan').'/unihan.txt';
-  if (!$fh = fopen($file, 'r')) {
-    drupal_set_message(t('Unable to open unihan.txt, please check your installation and reinstall module.'));
-    return;
-  }
-  fseek($fh, $pos);
-  db_set_active('sis');
-  for ($i=0; $i<500; $i++) {
-    if ($feof($fh)) {
-      break;
-    }
-    $line = trim(fgets($fh));
-    if($line == '' || $line[0] == '#') {
-      continue;
-    }
-    list($code, $field, $data) = explode("\t", $line);
-    $code = mb_convert_encoding('&#' . hexdec(substr($code, 2)) . ';', 'UTF-8', 'HTML-ENTITIES');
-    if (!db_result(db_query("SELECT COUNT(*) {unihan} WHERE `code`='%s'", $code))) {
-      db_query("INSERT INTO {unihan} SET `code`='%s'", $code);
-    }
-    if (in_array($field, array(
-      'kBigFive', 'kCCCII', 'kCNS1986', 'kCNS1992', 'kEACC', 'kIBMJapan', 'kIRG_GSource',
-      'kIRG_HSource', 'kIRG_JSource', 'kIRG_KSource', 'kIRG_KPSource', 'kIRG_TSource',
-      'kIRG_USource', 'kIRG_VSource', 'kKPS0', 'kKPS1'))) {
-      $data = hexdec($data);
-    }
-    if (!is_numeric($data)) {
-      $data = "'" . db_escape_string($data) . "'";
-    }
-    db_query("UPDATE {unihan} SET `$field`=$data WHERE `code`='%s'", $code);  //It's *probably* OK to use $data as a variable not a placeholder here. Real problem is quoting (or not) string (or int or float) variables.
-  }
-  fclose($fh);
-  db_set_active('default');
-}
-
-function unihan_import_finished($success, $results, $operations) {
-  return t('Import of unihan data completed');
-}
-
-function unihan_import_data_old() {
-  ini_set('max_execution_time', 300); // extend maximum execution time to five minutes. Probably better would be to process file in batches...
-  if (!$fh = fopen(drupal_get_path('module', 'unihan').'/unihan.txt', 'r')) {
-    drupal_set_message(t('Unable to open unihan.txt, please check your installation and reinstall module.'));
-    return;
-  }
-  fgets($fh);   // throw away first line (may have BOM)
-  while (!feof($fh)) {
-    $line = trim(fgets($fh));
-    if ($line[0] == "#" || $line=="") {
-        continue; // throw away comments or blank lines
-    }
-    list($code, $field, $data) = explode("\t", $line);
-    $code = mb_convert_encoding('&#' . hexdec(substr($code, 2)) . ';' , 'UTF-8', 'HTML-ENTITIES');
-    if (!$seen[$code]) {
-      db_query("INSERT INTO {unihan} SET `code`='%s'", $code);
-      $seen[$code] = TRUE;
-    }
-    if (in_array($field, array(
-      'kBigFive', 'kCCCII', 'kCNS1986', 'kCNS1992', 'kEACC', 'kIBMJapan', 'kIRG_GSource',
-      'kIRG_HSource', 'kIRG_JSource', 'kIRG_KSource', 'kIRG_KPSource', 'kIRG_TSource',
-      'kIRG_USource', 'kIRG_VSource', 'kKPS0', 'kKPS1'))) {
-      $data = hexdec($data);
-    }
-    if (!is_numeric($data)) {
-      $data = "'" . db_escape_string($data) . "'";
-    }
-    db_query("UPDATE {unihan} SET `$field`=$data WHERE `code`='%s'", $code);  //It's *probably* OK to use $data as a variable not a placeholder here. Real problem is quoting (or not) string (or int or float) variables.
-  }
+function unihan_uninstall() {
+  drupal_uninstall_schema('unihan');
+  variable_del('unihan_imported');
 }
