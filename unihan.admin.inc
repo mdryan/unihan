@@ -1,9 +1,39 @@
 <?php
 
+/**
+ * Returns path to unihan.txt file or FALSE if not found.
+ */
+function unihan_admin_get_filepath() {
+  static $filepath;
+  if (isset($filepath)) {
+    return $filepath;
+  }
+  $path = FALSE;
+  // Libraries API integration.
+  if (function_exists('libraries_get_path')) {
+    if ($path = libraries_get_path('unihan')) {
+      if (file_exists($path . '/unihan.txt')) {
+        $path .= '/unihan.txt';
+      }
+    }
+  }
+  // Manually check sites/all/libraries in case Libraries API is not available.
+  elseif (file_exists('./sites/all/libraries/unihan/unihan.txt')) {
+    $path = 'sites/all/libraries/unihan/unihan.txt';
+  }
+  return $path;
+}
+
+/**
+ * Admin page overview
+ */
 function unihan_admin() {
   return l('Import data', 'admin/settings/unihan/import');
 }
 
+/**
+ * Import unihan.txt into database
+ */
 function unihan_admin_import() {
   $batch = array(
     'title' => t('Importing unihan.txt'),
@@ -12,8 +42,7 @@ function unihan_admin_import() {
     'finished' => '_unihan_admin_import_finished',
     'file' => drupal_get_path('module', 'unihan').'/unihan.admin.inc',
   );
-  $file = drupal_get_path('module', 'unihan').'/unihan.txt';
-  if (!$fh = @fopen($file, 'r')) {
+  if (!$fh = @fopen(unihan_admin_get_filepath(), 'r')) {
     drupal_set_message(t('Unable to open unihan.txt, please check your installation.'), 'error');
     return '';
   }
@@ -31,10 +60,12 @@ function unihan_admin_import() {
   batch_process('admin/settings/unihan');
 }
 
-function _unihan_admin_import_from($pos, &$context) {
+/**
+ * Batch callback
+ */
+ function _unihan_admin_import_from($pos, &$context) {
   $context['message'] = t('Imported !size', array('!size' => format_size($pos)));
-  $file = drupal_get_path('module', 'unihan').'/unihan.txt';
-  if (!$fh = @fopen($file, 'r')) {
+  if (!$fh = @fopen(unihan_admin_get_filepath(), 'r')) {
     if (!$context['results']['error']) {
       drupal_set_message(t('Unable to open unihan.txt, please check your installation.'), 'error');
     }
@@ -66,6 +97,9 @@ function _unihan_admin_import_from($pos, &$context) {
   fclose($fh);
 }
 
+/**
+ * Batch completion callback
+ */
 function _unihan_admin_import_finished($success, $results, $operations) {
   if ($results['error']) {
     drupal_set_message(t('Import did not complete.'), 'error');

@@ -6,6 +6,36 @@
  *
  */
 
+function unihan_requirements($phase) {
+  $t = get_t();
+  include_once dirname(__FILE__) . '/unihan.admin.inc';
+  $requirements = array();
+  $requirements['unihan']['title'] = 'Unihan database';
+  if (variable_get('unihan_imported', FALSE)) {
+    $requirements['unihan']['value'] = $t('Imported');
+    $requirements['unihan']['severity'] = REQUIREMENT_OK;
+  }
+  else if (unihan_admin_get_filepath()) {
+    $requirements['unihan']['value'] = $t('Awaiting import');
+    $requirements['unihan']['description'] = $t('The Unihan database has not yet been imported. Visit !url to resolve.',
+      array('!url' => l('admin/settings/unihan/import', 'admin/settings/unihan/import')));
+    $requirements['unihan']['severity'] = REQUIREMENT_WARNING;
+  }
+  else {
+    $requirements['unihan']['value'] = $t('Missing');
+    $requirements['unihan']['description'] = $t('The <a href="@unihan">unihan.txt</a> file is missing. <a href="@download">Download</a> and extract it into the <code>@directory</code> directory.', array(
+                '@unihan' => 'http://www.unicode.org/charts/unihan.html',
+                '@download' => 'ftp://ftp.unicode.org/Public/UNIDATA/Unihan.zip',
+                '@directory' => 'sites/all/libraries/unihan',
+    ));
+    $requirements['unihan']['severity'] = REQUIREMENT_ERROR;
+  }
+  if ($phase == 'install') {
+    unset($requirements['unihan']['value']);
+  }
+  return $requirements;
+}
+
 function unihan_schema() {
   $schema['unihan'] = array(
     'description' => 'The Unihan database.',
