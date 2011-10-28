@@ -122,7 +122,10 @@ function unihan_schema() {
       'kVietnamese' => array('type' => 'varchar', 'length' => 255, 'description' => 'The character\'s pronunciation(s) in Quốc ngữ'),
       'kXerox' => array('type' => 'varchar', 'length' => 32, 'description' => 'The Xerox code for this character'),
       'kZVariant' => array('type' => 'varchar', 'length' => 32, 'description' => 'The Unicode value(s) for known z-variants of this character'),
-  ),
+      'kRSAdobe_Japan1_6' => array('type' => 'varchar', 'length' => 255, 'description' => 'Information on the glyphs in Adobe-Japan1-6 as contributed by Adobe.'),
+      'kIICore' => array('type' => 'float', 'description' => 'Indicates that a character is in IICore, the IRG-produced minimal set of required ideographs for East Asian use.'),
+      'kFennIndex' => array('type' => 'float', 'description' => 'The position of this character in _Fenn\'s Chinese-English Pocket Dictionary_'),
+    ),
     'primary key' => array('code'),
   );
   return $schema;
