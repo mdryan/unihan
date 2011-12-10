@@ -28,7 +28,7 @@ function unihan_admin_get_filepath() {
  * Admin page overview
  */
 function unihan_admin() {
-  return l('Import data', 'admin/settings/unihan/import');
+  return l(t('Import data'), 'admin/settings/unihan/import');
 }
 
 /**
@@ -40,7 +40,7 @@ function unihan_admin_import() {
     'operations' => array(),
     'progress_message' => '',
     'finished' => '_unihan_admin_import_finished',
-    'file' => drupal_get_path('module', 'unihan').'/unihan.admin.inc',
+    'file' => drupal_get_path('module', 'unihan') . '/unihan.admin.inc',
   );
   if (!$fh = @fopen(unihan_admin_get_filepath(), 'r')) {
     drupal_set_message(t('Unable to open unihan.txt, please check your installation.'), 'error');
@@ -75,7 +75,7 @@ function unihan_admin_import() {
   fseek($fh, $pos);
   while (!feof($fh) && $count++ < 500) {
     $line = trim(fgets($fh));
-    if($line == '' || $line[0] == '#') {
+    if ($line == '' || $line[0] == '#') {
       continue;
     }
     list($char, $field, $data) = explode("\t", $line);

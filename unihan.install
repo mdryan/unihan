@@ -15,7 +15,7 @@ function unihan_requirements($phase) {
     $requirements['unihan']['value'] = $t('Imported');
     $requirements['unihan']['severity'] = REQUIREMENT_OK;
   }
-  else if (unihan_admin_get_filepath()) {
+  elseif (unihan_admin_get_filepath()) {
     $requirements['unihan']['value'] = $t('Awaiting import');
     $requirements['unihan']['description'] = $t('The Unihan database has not yet been imported. Visit !url to resolve.',
       array('!url' => l('admin/settings/unihan/import', 'admin/settings/unihan/import')));
