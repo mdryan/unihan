@@ -41,7 +41,6 @@ function unihan_convert_raw($code) {
   exit;
 }
 
-
 function unihan_word2pinyin($str, $tone_marks = TRUE) {
     $pinyin = "";
     $len = drupal_strlen($str);
@@ -56,7 +55,6 @@ function unihan_word2pinyin($str, $tone_marks = TRUE) {
     }
     return array('pinyin' => ucfirst($pinyin));
 }
-
 
 function unihan_char2pinyin($char, $tone_marks) {
     $result = db_query("SELECT kMandarin FROM {unihan} WHERE code='%s'", $char);
