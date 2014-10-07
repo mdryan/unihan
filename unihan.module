@@ -23,7 +23,7 @@ function unihan_menu() {
 }
 
 function unihan_init() {
-  if (user_perm('access administration pages') && !variable_get('unihan_imported', FALSE) && $_GET['q'] != 'admin/settings/unihan/import') {
+  if (user_perm('access administration pages') && !variable_get('unihan_imported', FALSE) && $_GET['q'] != 'admin/settings/unihan/import' && $_GET['q'] != 'batch') {
     drupal_set_message(t('The Unihan database has not yet been imported. Visit !url to resolve.',
       array('!url' => l('admin/settings/unihan/import', 'admin/settings/unihan/import'))));
   }
