@@ -57,12 +57,18 @@ function unihan_word2pinyin($str, $tone_marks = TRUE) {
 }
 
 function unihan_char2pinyin($char, $tone_marks) {
-    $result = db_query("SELECT kMandarin FROM {unihan} WHERE code='%s'", $char);
+    $result = db_query("SELECT kMandarin, kHanyuPinLu FROM {unihan} WHERE code='%s'", $char);
     $result = db_fetch_object($result);
-    if (!$result || is_null($result->kMandarin)) {
+    if (!$result || (is_null($result->kMandarin) && empty($result->kHanyuPinLu))) {
         return NULL;
     }
-    list($pinyin, $alternatives) = explode(" ", $result->kMandarin, 2);    // only consider most popular romanisation
+    if (!empty($result->kHanyuPinLu)) {
+      list($pinlu) = explode(' ', $result->kHanyuPinLu, 2);
+      list($pinyin) = explode('(', $pinlu, 2);
+    }
+    else {
+      list($pinyin, $alternatives) = explode(' ', $result->kMandarin, 2);    // only consider most popular romanisation
+    }
     $tone = substr($pinyin, -1);
     $pinyin = strtolower(substr($pinyin, 0, -1));
     if (!$tone_marks) {
