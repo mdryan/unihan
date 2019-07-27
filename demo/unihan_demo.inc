@@ -21,10 +21,10 @@ function unihan_demo_page() {
 }
 
 function unihan_demo_pinyin_form($form_state) {
-  return array(
-    'convert' => array('#type' => 'textfield', '#title' => t('Chinese characters')),
-    'submit' => array('#type' => 'submit', '#value' => t('Convert')),
-  );
+  return [
+    'convert' => ['#type' => 'textfield', '#title' => t('Chinese characters')],
+    'submit' => ['#type' => 'submit', '#value' => t('Convert')],
+  ];
 }
 
 function unihan_demo_pinyin_form_submit($form, &$form_state) {

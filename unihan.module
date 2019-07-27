@@ -6,33 +6,33 @@
  */
 
 function unihan_menu() {
-  return array(
-    'admin/settings/unihan' => array(
+  return [
+    'admin/settings/unihan' => [
       'title' => 'Unihan tools',
       'file' => 'unihan.admin.inc',
       'page callback' => 'unihan_admin',
-      'access arguments' => array('access administration pages'),
-    ),
-    'admin/settings/unihan/import' => array(
+      'access arguments' => ['access administration pages'],
+    ],
+    'admin/settings/unihan/import' => [
       'title' => 'Import data',
       'file' => 'unihan.admin.inc',
       'page callback' => 'unihan_admin_import',
-      'access arguments' => array('access administration pages'),
-    ),
-  );
+      'access arguments' => ['access administration pages'],
+    ],
+  ];
 }
 
-function unihan_init() {
+function x_unihan_init() {
   if (user_perm('access administration pages') && !variable_get('unihan_imported', FALSE) && $_GET['q'] != 'admin/settings/unihan/import' && $_GET['q'] != 'batch') {
     drupal_set_message(t('The Unihan database has not yet been imported. Visit !url to resolve.',
-      array('!url' => l('admin/settings/unihan/import', 'admin/settings/unihan/import'))));
+      ['!url' => l('admin/settings/unihan/import', 'admin/settings/unihan/import')]));
   }
 }
 
 function unihan_xmlrpc() {
-  return array(
+  return [
     'unihan.pinyin' => 'unihan_word2pinyin',
-  );
+  ];
 }
 
 function unihan_convert_raw($code) {
@@ -53,12 +53,11 @@ function unihan_word2pinyin($str, $tone_marks = TRUE) {
             $pinyin .= $str[$i];
         }
     }
-    return array('pinyin' => ucfirst($pinyin));
+    return ['pinyin' => ucfirst($pinyin)];
 }
 
 function unihan_char2pinyin($char, $tone_marks) {
-    $result = db_query("SELECT kMandarin, kHanyuPinLu FROM {unihan} WHERE code='%s'", $char);
-    $result = db_fetch_object($result);
+    $result = db_query("SELECT kMandarin, kHanyuPinLu FROM {unihan} WHERE code=:code", [':code' => $char])->fetchObject();
     if (!$result || (is_null($result->kMandarin) && empty($result->kHanyuPinLu))) {
         return NULL;
     }
@@ -67,21 +66,21 @@ function unihan_char2pinyin($char, $tone_marks) {
       list($pinyin) = explode('(', $pinlu, 2);
     }
     else {
-      list($pinyin, $alternatives) = explode(' ', $result->kMandarin, 2);    // only consider most popular romanisation
+      list($pinyin) = explode(' ', $result->kMandarin, 2);    // only consider most popular romanisation
     }
     $tone = substr($pinyin, -1);
     $pinyin = strtolower(substr($pinyin, 0, -1));
     if (!$tone_marks) {
       return($pinyin);
     }
-    $translate = array(
-        'a' => array(1 => 'ā', 2 => 'á', 3 => 'ǎ', 4 => 'à', 5 => 'a'),
-        'e' => array(1 => 'ē', 2 => 'é', 3 => 'ě', 4 => 'è', 5 => 'e'),
-        'i' => array(1 => 'ī', 2 => 'í', 3 => 'ǐ', 4 => 'ì', 5 => 'i'),
-        'o' => array(1 => 'ō', 2 => 'ó', 3 => 'ǒ', 4 => 'ò', 5 => 'o'),
-        'u' => array(1 => 'ū', 2 => 'ú', 3 => 'ǔ', 4 => 'ù', 5 => 'u'),
-        'ü' => array(1 => 'ǖ', 2 => 'ǘ', 3 => 'ǚ', 4 => 'ǜ', 5 => 'ü'),
-    );
+    $translate = [
+        'a' => [1 => 'ā', 2 => 'á', 3 => 'ǎ', 4 => 'à', 5 => 'a'],
+        'e' => [1 => 'ē', 2 => 'é', 3 => 'ě', 4 => 'è', 5 => 'e'],
+        'i' => [1 => 'ī', 2 => 'í', 3 => 'ǐ', 4 => 'ì', 5 => 'i'],
+        'o' => [1 => 'ō', 2 => 'ó', 3 => 'ǒ', 4 => 'ò', 5 => 'o'],
+        'u' => [1 => 'ū', 2 => 'ú', 3 => 'ǔ', 4 => 'ù', 5 => 'u'],
+        'ü' => [1 => 'ǖ', 2 => 'ǘ', 3 => 'ǚ', 4 => 'ǜ', 5 => 'ü'],
+    ];
     if (strpos ($pinyin, 'a')) {
         $pinyin = str_replace('a', $translate['a'][$tone], $pinyin);    // if there's an 'a' then it takes the tone mark
     }
@@ -97,4 +96,59 @@ function unihan_char2pinyin($char, $tone_marks) {
         $pinyin = str_replace($last_vowel, $translate[$last_vowel][$tone], $pinyin);
     }
     return $pinyin;
+}
+
+function unihan_strip_tonemarks($string) {
+  return(strtr($string, [
+    'ā' => 'a',
+    'á' => 'a',
+    'ǎ' => 'a',
+    'à' => 'a',
+    'ē' => 'e',
+    'é' => 'e',
+    'ě' => 'e',
+    'è' => 'e',
+    'ī' => 'i',
+    'í' => 'i',
+    'ǐ' => 'i',
+    'ì' => 'i',
+    'ō' => 'o',
+    'ó' => 'o',
+    'ǒ' => 'o',
+    'ò' => 'o',
+    'ū' => 'u',
+    'ú' => 'u',
+    'ǔ' => 'u',
+    'ù' => 'u',
+    'ǖ' => 'v',
+    'ǘ' => 'v',
+    'ǚ' => 'v',
+    'ǜ' => 'v',
+    'ü' => 'v',
+    'Ā' => 'A',
+    'Á' => 'A',
+    'Ǎ' => 'A',
+    'À' => 'A',
+    'Ē' => 'E',
+    'É' => 'E',
+    'Ě' => 'E',
+    'È' => 'E',
+    'Ī' => 'I',
+    'Í' => 'I',
+    'Ǐ' => 'I',
+    'Ì' => 'I',
+    'Ō' => 'O',
+    'Ó' => 'O',
+    'Ǒ' => 'O',
+    'Ò' => 'O',
+    'Ū' => 'U',
+    'Ú' => 'U',
+    'Ǔ' => 'U',
+    'Ù' => 'U',
+    'Ǖ' => 'V',
+    'Ǘ' => 'V',
+    'Ǚ' => 'V',
+    'Ǜ' => 'V',
+    'Ü' => 'V',
+  ]));
 }

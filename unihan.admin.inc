@@ -35,13 +35,13 @@ function unihan_admin() {
  * Import unihan.txt into database
  */
 function unihan_admin_import() {
-  $batch = array(
+  $batch = [
     'title' => t('Importing unihan.txt'),
-    'operations' => array(),
+    'operations' => [],
     'progress_message' => '',
     'finished' => '_unihan_admin_import_finished',
     'file' => drupal_get_path('module', 'unihan') . '/unihan.admin.inc',
-  );
+  ];
   if (!$fh = @fopen(unihan_admin_get_filepath(), 'r')) {
     drupal_set_message(t('Unable to open unihan.txt, please check your installation.'), 'error');
     return '';
@@ -49,7 +49,7 @@ function unihan_admin_import() {
   fgets($fh); // throw away first line (always a comment and maybe BOM)
   while (!feof($fh)) {
     $pos = ftell($fh);
-    $batch['operations'][] = array('_unihan_admin_import_from', array($pos));
+    $batch['operations'][] = ['_unihan_admin_import_from', [$pos]];
     $count = 0;
     while (!feof($fh) && $count++ < 500) {
       fgets($fh);
@@ -64,7 +64,7 @@ function unihan_admin_import() {
  * Batch callback
  */
  function _unihan_admin_import_from($pos, &$context) {
-  $context['message'] = t('Imported !size', array('!size' => format_size($pos)));
+  $context['message'] = t('Imported !size', ['!size' => format_size($pos)]);
   if (!$fh = @fopen(unihan_admin_get_filepath(), 'r')) {
     if (!$context['results']['error']) {
       drupal_set_message(t('Unable to open unihan.txt, please check your installation.'), 'error');
@@ -83,10 +83,10 @@ function unihan_admin_import() {
     if (!db_result(db_query("SELECT COUNT(*) FROM {unihan} WHERE code='%s'", $code))) {
       db_query("INSERT INTO {unihan} SET `code`='%s'", $code);
     }
-    if (in_array($field, array(
+    if (in_array($field, [
       'kBigFive', 'kCCCII', 'kCNS1986', 'kCNS1992', 'kEACC', 'kIBMJapan', 'kIRG_GSource',
       'kIRG_HSource', 'kIRG_JSource', 'kIRG_KSource', 'kIRG_KPSource', 'kIRG_TSource',
-      'kIRG_USource', 'kIRG_VSource', 'kKPS0', 'kKPS1'))) {
+      'kIRG_USource', 'kIRG_VSource', 'kKPS0', 'kKPS1'])) {
       $data = hexdec($data);
     }
     if (!is_numeric($data)) {
