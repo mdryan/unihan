@@ -91,6 +91,7 @@ function unihan_char2pinyin($char, $tone_marks) {
         $pinyin = str_replace('o', $translate['o'][$tone], $pinyin);    // if there's an 'ou' then the 'o' takes the tone mark
     }
     else {
+        $matches = [];
         preg_match('/([aeiouü])[^aeiouü]*$/', $pinyin, $matches);       // otherwise the final vowel takes the tone mark
         $last_vowel = $matches[1];
         $pinyin = str_replace($last_vowel, $translate[$last_vowel][$tone], $pinyin);
