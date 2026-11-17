@@ -1,5 +1,4 @@
 name = "Unihan API Demonstration"
 description = "Test of functions for working with unihan database"
-core = 6.x
+core = 7.x
 dependencies[] = unihan
-

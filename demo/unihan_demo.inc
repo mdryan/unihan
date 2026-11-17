@@ -1,37 +1,62 @@
 <?php
+
 /**
-* Main page listing all demonstrations
-* @return string html page content
-*/
+ * @file
+ * Page callbacks for the unihan demonstration module.
+ */
+
+/**
+ * Page callback: lists all demonstrations.
+ */
 function unihan_demo_page() {
-  $items = unihan_demo_menu();
-  $output = "<dl>";
-  foreach ($items as $path => $item) {
-    if ($path == 'unihan') continue;
-    if ($item['type'] == MENU_CALLBACK) continue;
-    if ($item['type'] == MENU_DEFAULT_LOCAL_TASK) continue;
-    if (strpos($path, '%') !== FALSE) continue;
-    if ($item['access callback'] === TRUE || user_access($item['access arguments'][0])) {
-      $output .= "<dt>" . l(t($item['title']), $path) . "</dt>";
-      $output .= "<dd>" . t($item['description']) . "</dd>";
+  $output = '<dl>';
+  foreach (unihan_demo_menu() as $path => $definition) {
+    if ($path == 'unihan' || strpos($path, '%') !== FALSE) {
+      continue;
     }
+    // menu_get_item() checks access and returns translated text.
+    $item = menu_get_item($path);
+    $hidden_types = [MENU_CALLBACK, MENU_DEFAULT_LOCAL_TASK];
+    if (!$item || !$item['access'] || in_array($item['type'], $hidden_types)) {
+      continue;
+    }
+    $output .= '<dt>' . l($item['title'], $path) . '</dt>';
+    $output .= '<dd>' . filter_xss_admin($item['description']) . '</dd>';
   }
-  $output .= "</dl>";
+  $output .= '</dl>';
   return $output;
 }
 
-function unihan_demo_pinyin_form($form_state) {
-  return [
-    'convert' => ['#type' => 'textfield', '#title' => t('Chinese characters')],
-    'submit' => ['#type' => 'submit', '#value' => t('Convert')],
+/**
+ * Form constructor for the pinyin conversion demonstration.
+ *
+ * @see unihan_demo_pinyin_submit()
+ */
+function unihan_demo_pinyin($form, &$form_state) {
+  $form['convert'] = [
+    '#type' => 'textfield',
+    '#title' => t('Chinese characters'),
   ];
+  $form['submit'] = ['#type' => 'submit', '#value' => t('Convert')];
+  if (!empty($form_state['storage']['rows'])) {
+    $form['result'] = [
+      '#theme' => 'table',
+      '#rows' => $form_state['storage']['rows'],
+    ];
+  }
+  return $form;
 }
 
-function unihan_demo_pinyin_form_submit($form, &$form_state) {
-  global $base_url;
+/**
+ * Form submission handler for unihan_demo_pinyin().
+ */
+function unihan_demo_pinyin_submit($form, &$form_state) {
   $convert = $form_state['values']['convert'];
-  $result = xmlrpc("$base_url/xmlrpc.php", 'unihan.pinyin', $convert, TRUE);
-  drupal_set_message('<pre>' . print_r($result, TRUE) . '</pre>');
-  $result = xmlrpc("$base_url/xmlrpc.php", 'unihan.pinyin', $convert, FALSE);
-  drupal_set_message('<pre>' . print_r($result, TRUE) . '</pre>');
+  $rows = [];
+  foreach ([TRUE => t('With tone marks'), FALSE => t('Without tone marks')] as $tone_marks => $label) {
+    $result = unihan_word2pinyin($convert, (bool) $tone_marks);
+    $rows[] = [$label, check_plain($result['pinyin'])];
+  }
+  $form_state['storage']['rows'] = $rows;
+  $form_state['rebuild'] = TRUE;
 }

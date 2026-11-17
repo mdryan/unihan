@@ -1,23 +1,39 @@
 <?php
+
+/**
+ * @file
+ * Demonstration pages for the unihan module.
+ */
+
+/**
+ * Implements hook_menu().
+ */
 function unihan_demo_menu() {
   return [
     'unihan' => [
       'title' => 'Unihan tools',
       'page callback' => 'unihan_demo_page',
       'file' => 'unihan_demo.inc',
-      'access arguments' => ['access unihan demonstration']
+      'access arguments' => ['access unihan demonstration'],
     ],
     'unihan/pinyin' => [
       'title' => 'Pinyin Conversion',
+      'description' => 'Convert Chinese characters to pinyin.',
       'page callback' => 'drupal_get_form',
       'file' => 'unihan_demo.inc',
-      'page arguments' => ['unihan_demo_pinyin_form'],
+      'page arguments' => ['unihan_demo_pinyin'],
       'access arguments' => ['access unihan demonstration'],
     ],
   ];
 }
 
-function unihan_demo_perm() {
-  return ['access unihan demonstration'];
+/**
+ * Implements hook_permission().
+ */
+function unihan_demo_permission() {
+  return [
+    'access unihan demonstration' => [
+      'title' => t('Access Unihan demonstration pages'),
+    ],
+  ];
 }
-

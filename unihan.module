@@ -1,106 +1,151 @@
 <?php
-// $Id$
+
 /**
- *@file
- * Module for working with Unicode Unihan character database
+ * @file
+ * Module for working with the Unicode Unihan character database.
  */
 
+/**
+ * Implements hook_menu().
+ */
 function unihan_menu() {
   return [
-    'admin/settings/unihan' => [
-      'title' => 'Unihan tools',
+    'admin/config/regional/unihan' => [
+      'title' => 'Unihan database',
+      'description' => 'Status of the Unihan character database and import of unihan.txt.',
       'file' => 'unihan.admin.inc',
       'page callback' => 'unihan_admin',
-      'access arguments' => ['access administration pages'],
+      'access arguments' => ['administer site configuration'],
     ],
-    'admin/settings/unihan/import' => [
+    'admin/config/regional/unihan/import' => [
       'title' => 'Import data',
       'file' => 'unihan.admin.inc',
-      'page callback' => 'unihan_admin_import',
-      'access arguments' => ['access administration pages'],
+      'page callback' => 'drupal_get_form',
+      'page arguments' => ['unihan_admin_import'],
+      'access arguments' => ['administer site configuration'],
+      'type' => MENU_LOCAL_ACTION,
     ],
   ];
 }
 
-function x_unihan_init() {
-  if (user_perm('access administration pages') && !variable_get('unihan_imported', FALSE) && $_GET['q'] != 'admin/settings/unihan/import' && $_GET['q'] != 'batch') {
-    drupal_set_message(t('The Unihan database has not yet been imported. Visit !url to resolve.',
-      ['!url' => l('admin/settings/unihan/import', 'admin/settings/unihan/import')]));
-  }
-}
-
-function unihan_xmlrpc() {
-  return [
-    'unihan.pinyin' => 'unihan_word2pinyin',
-  ];
-}
-
+/**
+ * Prints the pinyin for a string of Chinese characters and exits.
+ *
+ * @param string $code
+ *   Chinese characters to convert.
+ */
 function unihan_convert_raw($code) {
   $result = unihan_word2pinyin($code);
   print $result['pinyin'];
   exit;
 }
 
+/**
+ * Converts a string of Chinese characters to pinyin.
+ *
+ * @param string $str
+ *   String to convert. Characters not found in the Unihan database are passed
+ *   through unchanged.
+ * @param bool $tone_marks
+ *   Whether to include tone marks in the pinyin.
+ *
+ * @return array
+ *   An array whose 'pinyin' element holds the converted string, with its first
+ *   letter capitalised.
+ */
 function unihan_word2pinyin($str, $tone_marks = TRUE) {
-    $pinyin = "";
-    $len = drupal_strlen($str);
-    for ($i=0; $i<$len; $i++) {
-        $ret = unihan_char2pinyin(drupal_substr($str, $i, 1), $tone_marks);
-        if ($ret) {
-            $pinyin .= $ret;
-        }
-        else {
-            $pinyin .= $str[$i];
-        }
-    }
-    return ['pinyin' => ucfirst($pinyin)];
+  $pinyin = '';
+  $len = drupal_strlen($str);
+  for ($i = 0; $i < $len; $i++) {
+    $char = drupal_substr($str, $i, 1);
+    $ret = unihan_char2pinyin($char, $tone_marks);
+    $pinyin .= $ret ? $ret : $char;
+  }
+  return ['pinyin' => drupal_ucfirst($pinyin)];
 }
 
+/**
+ * Converts a single Chinese character to pinyin.
+ *
+ * @param string $char
+ *   The character to convert.
+ * @param bool $tone_marks
+ *   Whether to include tone marks in the pinyin.
+ *
+ * @return string|null
+ *   The most common pinyin reading of the character, or NULL if the character
+ *   has no Mandarin reading in the Unihan database.
+ */
 function unihan_char2pinyin($char, $tone_marks) {
-    $result = db_query("SELECT kMandarin, kHanyuPinLu FROM {unihan} WHERE code=:code", [':code' => $char])->fetchObject();
-    if (!$result || (is_null($result->kMandarin) && empty($result->kHanyuPinLu))) {
-        return NULL;
-    }
-    if (!empty($result->kHanyuPinLu)) {
-      list($pinlu) = explode(' ', $result->kHanyuPinLu, 2);
-      list($pinyin) = explode('(', $pinlu, 2);
-    }
-    else {
-      list($pinyin) = explode(' ', $result->kMandarin, 2);    // only consider most popular romanisation
-    }
-    $tone = substr($pinyin, -1);
-    $pinyin = strtolower(substr($pinyin, 0, -1));
-    if (!$tone_marks) {
-      return($pinyin);
-    }
-    $translate = [
-        'a' => [1 => 'ā', 2 => 'á', 3 => 'ǎ', 4 => 'à', 5 => 'a'],
-        'e' => [1 => 'ē', 2 => 'é', 3 => 'ě', 4 => 'è', 5 => 'e'],
-        'i' => [1 => 'ī', 2 => 'í', 3 => 'ǐ', 4 => 'ì', 5 => 'i'],
-        'o' => [1 => 'ō', 2 => 'ó', 3 => 'ǒ', 4 => 'ò', 5 => 'o'],
-        'u' => [1 => 'ū', 2 => 'ú', 3 => 'ǔ', 4 => 'ù', 5 => 'u'],
-        'ü' => [1 => 'ǖ', 2 => 'ǘ', 3 => 'ǚ', 4 => 'ǜ', 5 => 'ü'],
-    ];
-    if (strpos ($pinyin, 'a')) {
-        $pinyin = str_replace('a', $translate['a'][$tone], $pinyin);    // if there's an 'a' then it takes the tone mark
-    }
-    else if (strpos ($pinyin, 'e')) {
-        $pinyin = str_replace('e', $translate['e'][$tone], $pinyin);    // likewise if there's an 'e' then it takes the tone mark
-    }
-    else if (strpos ($pinyin, 'ou')) {
-        $pinyin = str_replace('o', $translate['o'][$tone], $pinyin);    // if there's an 'ou' then the 'o' takes the tone mark
-    }
-    else {
-        $matches = [];
-        preg_match('/([aeiouü])[^aeiouü]*$/', $pinyin, $matches);       // otherwise the final vowel takes the tone mark
-        $last_vowel = $matches[1];
-        $pinyin = str_replace($last_vowel, $translate[$last_vowel][$tone], $pinyin);
-    }
+  $result = db_query('SELECT kMandarin, kHanyuPinLu FROM {unihan} WHERE code = :code', [
+    ':code' => $char,
+  ])->fetchObject();
+  if (!$result || (is_null($result->kMandarin) && empty($result->kHanyuPinLu))) {
+    return NULL;
+  }
+  if (!empty($result->kHanyuPinLu)) {
+    list($pinlu) = explode(' ', $result->kHanyuPinLu, 2);
+    list($pinyin) = explode('(', $pinlu, 2);
+  }
+  else {
+    // Only consider most popular romanisation.
+    list($pinyin) = explode(' ', $result->kMandarin, 2);
+  }
+  $translate = [
+    'a' => [1 => 'ā', 2 => 'á', 3 => 'ǎ', 4 => 'à', 5 => 'a'],
+    'e' => [1 => 'ē', 2 => 'é', 3 => 'ě', 4 => 'è', 5 => 'e'],
+    'i' => [1 => 'ī', 2 => 'í', 3 => 'ǐ', 4 => 'ì', 5 => 'i'],
+    'o' => [1 => 'ō', 2 => 'ó', 3 => 'ǒ', 4 => 'ò', 5 => 'o'],
+    'u' => [1 => 'ū', 2 => 'ú', 3 => 'ǔ', 4 => 'ù', 5 => 'u'],
+    'ü' => [1 => 'ǖ', 2 => 'ǘ', 3 => 'ǚ', 4 => 'ǜ', 5 => 'ü'],
+  ];
+  // The data is in upper case (e.g. LÜ3), so lower case it multibyte-safely.
+  $tone = substr($pinyin, -1);
+  $pinyin = drupal_strtolower(substr($pinyin, 0, -1));
+  if (!$tone_marks) {
+    return unihan_strip_tonemarks($pinyin);
+  }
+  if (!isset($translate['a'][$tone])) {
     return $pinyin;
+  }
+  if (strpos($pinyin, 'a') !== FALSE) {
+    // If there's an 'a' then it takes the tone mark.
+    $pinyin = str_replace('a', $translate['a'][$tone], $pinyin);
+  }
+  elseif (strpos($pinyin, 'e') !== FALSE) {
+    // Likewise if there's an 'e' then it takes the tone mark.
+    $pinyin = str_replace('e', $translate['e'][$tone], $pinyin);
+  }
+  elseif (strpos($pinyin, 'ou') !== FALSE) {
+    // If there's an 'ou' then the 'o' takes the tone mark.
+    $pinyin = str_replace('o', $translate['o'][$tone], $pinyin);
+  }
+  // Otherwise the final vowel takes the tone mark. Syllables without a vowel
+  // (e.g. m, ng) are left unmarked.
+  elseif (preg_match('/([aeiouü])[^aeiouü]*$/u', $pinyin, $matches)) {
+    $last_vowel = $matches[1];
+    $pinyin = str_replace($last_vowel, $translate[$last_vowel][$tone], $pinyin);
+  }
+  return $pinyin;
 }
 
+/**
+ * Removes tone marks from pinyin.
+ *
+ * Accepts both precomposed (ǚ) and decomposed (ü followed by a combining
+ * accent) forms. Ü is written as YU, or as U in ÜE, following the rules for
+ * Chinese passports, so 吕 (lǚ) becomes lyu and 虐 (nüè) becomes nue.
+ *
+ * @param string $string
+ *   Pinyin with tone marks.
+ *
+ * @return string
+ *   The pinyin without tone marks.
+ *
+ * @see https://www.nia.gov.cn/n741440/n741542/c1440098/content.html
+ */
 function unihan_strip_tonemarks($string) {
-  return(strtr($string, [
+  $string = strtr($string, [
     'ā' => 'a',
     'á' => 'a',
     'ǎ' => 'a',
@@ -121,11 +166,14 @@ function unihan_strip_tonemarks($string) {
     'ú' => 'u',
     'ǔ' => 'u',
     'ù' => 'u',
-    'ǖ' => 'v',
-    'ǘ' => 'v',
-    'ǚ' => 'v',
-    'ǜ' => 'v',
-    'ü' => 'v',
+    'ǖ' => 'ü',
+    'ǘ' => 'ü',
+    'ǚ' => 'ü',
+    'ǜ' => 'ü',
+    'ǖ' => 'ü',
+    'ǘ' => 'ü',
+    'ǚ' => 'ü',
+    'ǜ' => 'ü',
     'Ā' => 'A',
     'Á' => 'A',
     'Ǎ' => 'A',
@@ -146,10 +194,21 @@ function unihan_strip_tonemarks($string) {
     'Ú' => 'U',
     'Ǔ' => 'U',
     'Ù' => 'U',
-    'Ǖ' => 'V',
-    'Ǘ' => 'V',
-    'Ǚ' => 'V',
-    'Ǜ' => 'V',
-    'Ü' => 'V',
-  ]));
+    'Ǖ' => 'Ü',
+    'Ǘ' => 'Ü',
+    'Ǚ' => 'Ü',
+    'Ǜ' => 'Ü',
+    'Ǖ' => 'Ü',
+    'Ǘ' => 'Ü',
+    'Ǚ' => 'Ü',
+    'Ǜ' => 'Ü',
+  ]);
+  // strtr() prefers the longest match, so ÜE is matched before Ü.
+  return strtr($string, [
+    'ÜE' => 'UE',
+    'Üe' => 'Ue',
+    'üe' => 'ue',
+    'Ü' => 'YU',
+    'ü' => 'yu',
+  ]);
 }

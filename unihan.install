@@ -1,141 +1,444 @@
 <?php
-// $Id$
+
 /**
- *@file
- *Install file for unihan module
- *
+ * @file
+ * Install, update and uninstall functions for the unihan module.
  */
 
-function x_unihan_requirements($phase) {
-  $t = get_t();
-  include_once dirname(__FILE__) . '/unihan.admin.inc';
+/**
+ * Implements hook_requirements().
+ */
+function unihan_requirements($phase) {
   $requirements = [];
-  $requirements['unihan']['title'] = 'Unihan database';
+  if ($phase != 'runtime') {
+    return $requirements;
+  }
+  $t = get_t();
+  module_load_include('inc', 'unihan', 'unihan.admin');
+  $requirements['unihan']['title'] = $t('Unihan database');
   if (variable_get('unihan_imported', FALSE)) {
     $requirements['unihan']['value'] = $t('Imported');
     $requirements['unihan']['severity'] = REQUIREMENT_OK;
   }
   elseif (unihan_admin_get_filepath()) {
     $requirements['unihan']['value'] = $t('Awaiting import');
-    $requirements['unihan']['description'] = $t('The Unihan database has not yet been imported. Visit !url to resolve.',
-      ['!url' => l('admin/settings/unihan/import', 'admin/settings/unihan/import')]);
+    $requirements['unihan']['description'] = $t('The Unihan database has not yet been imported. <a href="@url">Import it now</a>.', [
+      '@url' => url('admin/config/regional/unihan/import'),
+    ]);
     $requirements['unihan']['severity'] = REQUIREMENT_WARNING;
   }
   else {
     $requirements['unihan']['value'] = $t('Missing');
-    $requirements['unihan']['description'] = $t('The <a href="@unihan">unihan.txt</a> file is missing. <a href="@download">Download</a> and extract it into the <code>@directory</code> directory.', [
-                '@unihan' => 'http://www.unicode.org/charts/unihan.html',
-                '@download' => 'ftp://ftp.unicode.org/Public/UNIDATA/Unihan.zip',
-                '@directory' => 'sites/all/libraries/unihan',
+    $requirements['unihan']['description'] = $t('The <a href="@unihan">unihan.txt</a> file is missing. Place it in the <code>@directory</code> directory.', [
+      '@unihan' => 'https://www.unicode.org/charts/unihan.html',
+      '@directory' => 'sites/all/libraries/unihan',
     ]);
     $requirements['unihan']['severity'] = REQUIREMENT_ERROR;
-  }
-  if ($phase == 'install') {
-    unset($requirements['unihan']['value']);
   }
   return $requirements;
 }
 
-function x_unihan_schema() {
+/**
+ * Implements hook_schema().
+ */
+function unihan_schema() {
   $schema['unihan'] = [
     'description' => 'The Unihan database.',
     'fields' => [
-      'code' => ['type' => 'char', 'length' => 1, 'not null' => TRUE, 'description' => 'The unicode character itself.'],
-      'kAccountingNumeric' => ['type' => 'float', 'description' => 'The value of the character when used in the writing of accounting numerals.'],
-      'kAlternateKangXi' => ['type' => 'float', 'description' => 'An alternate possible position for the character in the KangXi dictionary.'],
-      'kAlternateMorohashi' => ['type' => 'varchar', 'length' => 32, 'description' => 'An alternate possible position for the character in the Morohashi dictionary.'],
-      'kBigFive' => ['type' => 'int', 'description' => 'The Big Five mapping for this character in hex.'],
-      'kCangjie' => ['type' => 'varchar', 'length' => 32, 'description' => 'The cangjie input code for the character.'],
-      'kCantonese' => ['type' => 'varchar', 'length' => 255, 'description' => 'The Cantonese pronunciation(s) for this character.'],
-      'kCCCII' => ['type' => 'int', 'description' => 'The CCCII mapping for this character in hex.'],
-      'kCihaiT' => ['type' => 'float', 'description' => 'The position of this character in the Cihai (辭海) dictionary, single volume edition, published in Hong Kong by the Zhonghua Bookstore, 1983 (reprint of the 1947 edition), ISBN 962-231-005-2.'],
-      'kCNS1986' => ['type' => 'int', 'description' => 'The CNS 11643-1986 mapping for this character in hex.'],
-      'kCNS1992' => ['type' => 'int', 'description' => 'The CNS 11643-1992 mapping for this character in hex.'],
-      'kCompatibilityVariant' => ['type' => 'varchar', 'length' => 32, 'description' => 'The compatibility decomposition for this ideograph, derived from the UnicodeData.txt file.'],
-      'kCowles' => ['type' => 'float', 'description' => 'The index or indices of this character in Roy T. Cowles, _A Pocket Dictionary of Cantonese_, Hong Kong: University Press, 1999.'],
-      'kDaeJaweon' => ['type' => 'float', 'description' => 'The position of this character in the Dae Jaweon (Korean) dictionary used in the four-dictionary sorting algorithm.'],
-      'kDefinition' => ['type' => 'text', 'description' => 'An English definition for this character.'],
-      'kEACC' => ['type' => 'int', 'description' => 'The EACC mapping for this character in hex.'],
-      'kFenn' => ['type' => 'varchar', 'length' => 32, 'description' => 'Data on the character from _Fenn\'s Chinese-English Pocket Dictionary_ by Courtenay H. Fenn, Cambridge, Mass.: Harvard University Press, 1942.'],
-      'kFrequency' => ['type' => 'float', 'description' => 'A rough frequency measurement for the character based on analysis of Chinese USENET postings; characters with a kFrequency of 1 are the most common, those with a kFrequency of 2 are less common, and so on, through a kFrequency of 5.'],
-      'kGB0' => ['type' => 'float', 'description' => 'The GB 2312-80 mapping for this character in ku/ten form.'],
-      'kGB1' => ['type' => 'float', 'description' => 'The GB 12345-90 mapping for this character in ku/ten form.'],
-      'kGB3' => ['type' => 'float', 'description' => 'The GB 7589-87 mapping for this character in ku/ten form.'],
-      'kGB5' => ['type' => 'float', 'description' => 'The GB 7590-87 mapping for this character in ku/ten form.'],
-      'kGB7' => ['type' => 'float', 'description' => 'The "General Use Characters for Modern Chinese" mapping for this character.'],
-      'kGB8' => ['type' => 'float', 'description' => 'The GB 8565-89 mapping for this character in ku/ten form.'],
-      'kGradeLevel' => ['type' => 'float', 'description' => 'The grade in the Hong Kong school system by which a student is expected to know the character.'],
-      'kGSR' => ['type' => 'varchar', 'length' => 32, 'description' => 'The position of this character in Bernhard Karlgren\'s _Grammata Serica Recensa_ (1957).'],
-      'kHanYu' => ['type' => 'float', 'description' => 'The position of this character in the Hanyu Da Zidian (HDZ) Chinese character dictionary'],
-      'kHanyuPinlu' => ['type' => 'varchar', 'length' => 255, 'description' => 'The Pronunciations and Frequencies of this character.'],
-      'kHKGlyph' => ['type' => 'float', 'description' => 'The index of the character in 常用字字形表 (二零零零年修訂本), 香港: 香港教育學院, 2000, ISBN 962-949-040-4.'],
-      'kHKSCS' => ['type' => 'varchar', 'length' => 32, 'description' => 'Mappings to the Big Five extended code points used for the Hong Kong Supplementary Character Set'],
-      'kIBMJapan' => ['type' => 'int', 'description' => 'The IBM Japanese mapping for this character in hex.'],
-      'kIRGDaeJaweon' => ['type' => 'float', 'description' => 'The position of this character in the Dae Jaweon (Korean) dictionary used in the four-dictionary sorting algorithm.'],
-      'kIRGDaiKanwaZiten' => ['type' => 'varchar', 'length' => 32, 'description' => 'The index of this character in the Dae Kanwa Ziten, aka Morohashi dictionary (Japanese) used in the four-dictionary sorting algorithm.'],
-      'kIRG_GSource' => ['type' => 'int', 'description' => 'The IRG "G" source mapping for this character in hex.'],
-      'kIRGHanyuDaZidian' => ['type' => 'float', 'description' => 'The position of this character in the Hanyu Da Zidian (PRC) dictionary used in the four-dictionary sorting algorithm.'],
-      'kIRG_HSource' => ['type' => 'int', 'description' => 'The IRG "H" source mapping for this character in hex.'],
-      'kIRG_JSource' => ['type' => 'int', 'description' => 'The IRG "J" source mapping for this character in hex.'],
-      'kIRGKangXi' => ['type' => 'float', 'description' => 'The position of this character in the KangXi dictionary used in the four-dictionary sorting algorithm.'],
-      'kIRG_KPSource' => ['type' => 'int', 'description' => 'The IRG "KP" source mapping for this character in hex.'],
-      'kIRG_KSource' => ['type' => 'int', 'description' => 'The IRG "K" source mapping for this character in hex.'],
-      'kIRG_TSource' => ['type' => 'int', 'description' => 'The IRG "T" source mapping for this character in hex.'],
-      'kIRG_USource' => ['type' => 'int', 'description' => 'The IRG "U" source mapping for this character.'],
-      'kIRG_VSource' => ['type' => 'int', 'description' => 'The IRG "V" source mapping for this character in hex.'],
-      'kJapaneseKun' => ['type' => 'varchar', 'length' => 255, 'description' => 'The Japanese pronunciation(s) of this character.'],
-      'kJapaneseOn' => ['type' => 'varchar', 'length' => 255, 'description' => 'The Sino-Japanese pronunciation(s) of this character.'],
-      'kJIS0213' => ['type' => 'varchar', 'length' => 32, 'description' => 'The JIS X 0213-2000 mapping for this character in min,ku,ten form.'],
-      'kJis0' => ['type' => 'float', 'description' => 'The JIS X 0208-1990 mapping for this character in ku/ten form.'],
-      'kJis1' => ['type' => 'float', 'description' => 'The JIS X 0212-1990 mapping for this character in ku/ten form.'],
-      'kKangXi' => ['type' => 'float', 'description' => 'The position of this character in the KangXi dictionary used in the four-dictionary sorting algorithm.'],
-      'kKarlgren' => ['type' => 'varchar', 'length' => 32, 'description' => 'The index of this character in _Analytic Dictionary of Chinese and Sino-Japanese_ by Bernhard Karlgren, New York: Dover Publications, Inc., 1974.'],
-      'kKorean' => ['type' => 'varchar', 'length' => 255, 'description' => 'The Korean pronunciation(s) of this character, using the Yale romanization system.'],
-      'kKPS0' => ['type' => 'int', 'description' => 'The KP 9566-97 mapping for this character in hexadecimal form.'],
-      'kKPS1' => ['type' => 'int', 'description' => 'The KPS 10721-2000 mapping for this character in hexadecimal form.'],
-      'kKSC0' => ['type' => 'float', 'description' => 'The KS X 1001:1992 (KS C 5601-1989) mapping for this character in ku/ten form.'],
-      'kKSC1' => ['type' => 'float', 'description' => 'The KS X 1002:1991 (KS C 5657-1991) mapping for this character in ku/ten form.'],
-      'kLau' => ['type' => 'varchar', 'length' => 255, 'description' => 'The index of this character in _A Practical Cantonese-English Dictionary_ by Sidney Lau, Hong Kong: The Government Printer, 1977.'],
-      'kMainlandTelegraph' => ['type' => 'float', 'description' => 'The PRC telegraph code for this character.'],
-      'kMandarin' => ['type' => 'varchar', 'length' => 255, 'description' => 'The Mandarin pronunciation(s) for this character in pinyin; Mandarin pronunciations are sorted in order of frequency, not alphabetically'],
-      'kMatthews' => ['type' => 'float', 'description' => 'The index of this character in _Mathews\' Chinese-English Dictionary_ by Robert H. Mathews, Cambrige: Harvard University Press, 1975.'],
-      'kMeyerWempe' => ['type' => 'varchar', 'length' => 255, 'description' => 'The index of this character in the _Student\'s Cantonese-English Dictionary_ by Bernard F. Meyer and Theodore F. Wempe (3rd edition, 1947).'],
-      'kMorohashi' => ['type' => 'varchar', 'length' => 32, 'description' => 'The index of this character in the Dae Kanwa Ziten, aka Morohashi dictionary (Japanese) used in the four-dictionary sorting algorithm.'],
-      'kNelson' => ['type' => 'varchar', 'length' => 255, 'description' => 'The index of this character in _The Modern Reader\'s Japanese-English Character Dictionary_ by Andrew Nathaniel Nelson, Rutland, Vermont: Charles E. Tuttle Company, 1974.'],
-      'kOtherNumeric' => ['type' => 'float', 'description' => 'The numeric value for the character in certain unusual, specialized contexts.'],
-      'kPhonetic' => ['type' => 'varchar', 'length' => 32, 'description' => 'The phonetic index for the character from _Ten Thousand Characters: An Analytic Dictionary_ by G. Hugh Casey, S.J. Hong Kong: Kelley and Walsh, 1980.'],
-      'kPrimaryNumeric' => ['type' => 'float', 'description' => 'The value of the character when used in the writing of numbers in the standard fashion.'],
-      'kPseudoGB1' => ['type' => 'float', 'description' => 'A "GB 12345-90" code point assigned this character for the purposes of including it within Unihan.'],
-      'kRSJapanese' => ['type' => 'float', 'description' => 'A Japanese radical/stroke count for this character.'],
-      'kRSKangXi' => ['type' => 'float', 'description' => 'A KangXi radical/stroke count for this character.'],
-      'kRSKanWa' => ['type' => 'float', 'description' => 'A Morohashi radical/stroke count for this character.'],
-      'kRSKorean' => ['type' => 'float', 'description' => 'A Korean radical/stroke count for this character.'],
-      'kRSUnicode' => ['type' => 'float', 'description' => 'A standard radical/stroke count for this character'],
-      'kSBGY' => ['type' => 'float', 'description' => 'The position of this character in the Song Ben Guang Yun (SBGY) Medieval Chinese character dictionary'],
-      'kSemanticVariant' => ['type' => 'varchar', 'length' => 255, 'description' => 'The Unicode value for a semantic variant for this character.'],
-      'kSimplifiedVariant' => ['type' => 'varchar', 'length' => 32, 'description' => 'The Unicode value for the simplified Chinese variant for this character (if any).'],
-      'kSpecializedSemanticVariant' => ['type' => 'varchar', 'length' => 32, 'description' => 'The Unicode value for a specialized semantic variant for this character.'],
-      'kTaiwanTelegraph' => ['type' => 'float', 'description' => 'The Taiwanese telegraph code for this character.'],
-      'kTang' => ['type' => 'varchar', 'length' => 255, 'description' => 'The Tang dynasty pronunciation(s) of this character, derived from _T\'ang Poetic Vocabulary_ by Hugh M. Stimson, Far Eastern Publications, Yale Univ. 1976.'],
-      'kTotalStrokes' => ['type' => 'float', 'description' => 'The total number of strokes in the character (including the radical).'],
-      'kTraditionalVariant' => ['type' => 'varchar', 'length' => 255, 'description' => 'The Unicode value(s) for the traditional Chinese variant(s) for this character.'],
-      'kVietnamese' => ['type' => 'varchar', 'length' => 255, 'description' => 'The character\'s pronunciation(s) in Quốc ngữ'],
-      'kXerox' => ['type' => 'varchar', 'length' => 32, 'description' => 'The Xerox code for this character'],
-      'kZVariant' => ['type' => 'varchar', 'length' => 32, 'description' => 'The Unicode value(s) for known z-variants of this character'],
-      'kRSAdobe_Japan1_6' => ['type' => 'varchar', 'length' => 255, 'description' => 'Information on the glyphs in Adobe-Japan1-6 as contributed by Adobe.'],
-      'kIICore' => ['type' => 'float', 'description' => 'Indicates that a character is in IICore, the IRG-produced minimal set of required ideographs for East Asian use.'],
-      'kFennIndex' => ['type' => 'float', 'description' => 'The position of this character in _Fenn\'s Chinese-English Pocket Dictionary_'],
+      'code' => [
+        'type' => 'char',
+        'length' => 1,
+        'not null' => TRUE,
+        'description' => 'The unicode character itself.',
+      ],
+      'kAccountingNumeric' => [
+        'type' => 'float',
+        'description' => 'The value of the character when used in the writing of accounting numerals.',
+      ],
+      'kAlternateKangXi' => [
+        'type' => 'float',
+        'description' => 'An alternate possible position for the character in the KangXi dictionary.',
+      ],
+      'kAlternateMorohashi' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'An alternate possible position for the character in the Morohashi dictionary.',
+      ],
+      'kBigFive' => [
+        'type' => 'int',
+        'description' => 'The Big Five mapping for this character in hex.',
+      ],
+      'kCangjie' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The cangjie input code for the character.',
+      ],
+      'kCantonese' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The Cantonese pronunciation(s) for this character.',
+      ],
+      'kCCCII' => [
+        'type' => 'int',
+        'description' => 'The CCCII mapping for this character in hex.',
+      ],
+      'kCihaiT' => [
+        'type' => 'float',
+        'description' => 'The position of this character in the Cihai (辭海) dictionary, single volume edition, published in Hong Kong by the Zhonghua Bookstore, 1983 (reprint of the 1947 edition), ISBN 962-231-005-2.',
+      ],
+      'kCNS1986' => [
+        'type' => 'int',
+        'description' => 'The CNS 11643-1986 mapping for this character in hex.',
+      ],
+      'kCNS1992' => [
+        'type' => 'int',
+        'description' => 'The CNS 11643-1992 mapping for this character in hex.',
+      ],
+      'kCompatibilityVariant' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The compatibility decomposition for this ideograph, derived from the UnicodeData.txt file.',
+      ],
+      'kCowles' => [
+        'type' => 'float',
+        'description' => 'The index or indices of this character in Roy T. Cowles, _A Pocket Dictionary of Cantonese_, Hong Kong: University Press, 1999.',
+      ],
+      'kDaeJaweon' => [
+        'type' => 'float',
+        'description' => 'The position of this character in the Dae Jaweon (Korean) dictionary used in the four-dictionary sorting algorithm.',
+      ],
+      'kDefinition' => [
+        'type' => 'text',
+        'description' => 'An English definition for this character.',
+      ],
+      'kEACC' => [
+        'type' => 'int',
+        'description' => 'The EACC mapping for this character in hex.',
+      ],
+      'kFenn' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'Data on the character from _Fenn\'s Chinese-English Pocket Dictionary_ by Courtenay H. Fenn, Cambridge, Mass.: Harvard University Press, 1942.',
+      ],
+      'kFrequency' => [
+        'type' => 'float',
+        'description' => 'A rough frequency measurement for the character based on analysis of Chinese USENET postings; characters with a kFrequency of 1 are the most common, those with a kFrequency of 2 are less common, and so on, through a kFrequency of 5.',
+      ],
+      'kGB0' => [
+        'type' => 'float',
+        'description' => 'The GB 2312-80 mapping for this character in ku/ten form.',
+      ],
+      'kGB1' => [
+        'type' => 'float',
+        'description' => 'The GB 12345-90 mapping for this character in ku/ten form.',
+      ],
+      'kGB3' => [
+        'type' => 'float',
+        'description' => 'The GB 7589-87 mapping for this character in ku/ten form.',
+      ],
+      'kGB5' => [
+        'type' => 'float',
+        'description' => 'The GB 7590-87 mapping for this character in ku/ten form.',
+      ],
+      'kGB7' => [
+        'type' => 'float',
+        'description' => 'The "General Use Characters for Modern Chinese" mapping for this character.',
+      ],
+      'kGB8' => [
+        'type' => 'float',
+        'description' => 'The GB 8565-89 mapping for this character in ku/ten form.',
+      ],
+      'kGradeLevel' => [
+        'type' => 'float',
+        'description' => 'The grade in the Hong Kong school system by which a student is expected to know the character.',
+      ],
+      'kGSR' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The position of this character in Bernhard Karlgren\'s _Grammata Serica Recensa_ (1957).',
+      ],
+      'kHanYu' => [
+        'type' => 'float',
+        'description' => 'The position of this character in the Hanyu Da Zidian (HDZ) Chinese character dictionary',
+      ],
+      'kHanyuPinlu' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The Pronunciations and Frequencies of this character.',
+      ],
+      'kHKGlyph' => [
+        'type' => 'float',
+        'description' => 'The index of the character in 常用字字形表 (二零零零年修訂本), 香港: 香港教育學院, 2000, ISBN 962-949-040-4.',
+      ],
+      'kHKSCS' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'Mappings to the Big Five extended code points used for the Hong Kong Supplementary Character Set',
+      ],
+      'kIBMJapan' => [
+        'type' => 'int',
+        'description' => 'The IBM Japanese mapping for this character in hex.',
+      ],
+      'kIRGDaeJaweon' => [
+        'type' => 'float',
+        'description' => 'The position of this character in the Dae Jaweon (Korean) dictionary used in the four-dictionary sorting algorithm.',
+      ],
+      'kIRGDaiKanwaZiten' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The index of this character in the Dae Kanwa Ziten, aka Morohashi dictionary (Japanese) used in the four-dictionary sorting algorithm.',
+      ],
+      'kIRG_GSource' => [
+        'type' => 'int',
+        'description' => 'The IRG "G" source mapping for this character in hex.',
+      ],
+      'kIRGHanyuDaZidian' => [
+        'type' => 'float',
+        'description' => 'The position of this character in the Hanyu Da Zidian (PRC) dictionary used in the four-dictionary sorting algorithm.',
+      ],
+      'kIRG_HSource' => [
+        'type' => 'int',
+        'description' => 'The IRG "H" source mapping for this character in hex.',
+      ],
+      'kIRG_JSource' => [
+        'type' => 'int',
+        'description' => 'The IRG "J" source mapping for this character in hex.',
+      ],
+      'kIRGKangXi' => [
+        'type' => 'float',
+        'description' => 'The position of this character in the KangXi dictionary used in the four-dictionary sorting algorithm.',
+      ],
+      'kIRG_KPSource' => [
+        'type' => 'int',
+        'description' => 'The IRG "KP" source mapping for this character in hex.',
+      ],
+      'kIRG_KSource' => [
+        'type' => 'int',
+        'description' => 'The IRG "K" source mapping for this character in hex.',
+      ],
+      'kIRG_TSource' => [
+        'type' => 'int',
+        'description' => 'The IRG "T" source mapping for this character in hex.',
+      ],
+      'kIRG_USource' => [
+        'type' => 'int',
+        'description' => 'The IRG "U" source mapping for this character.',
+      ],
+      'kIRG_VSource' => [
+        'type' => 'int',
+        'description' => 'The IRG "V" source mapping for this character in hex.',
+      ],
+      'kJapaneseKun' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The Japanese pronunciation(s) of this character.',
+      ],
+      'kJapaneseOn' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The Sino-Japanese pronunciation(s) of this character.',
+      ],
+      'kJIS0213' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The JIS X 0213-2000 mapping for this character in min,ku,ten form.',
+      ],
+      'kJis0' => [
+        'type' => 'float',
+        'description' => 'The JIS X 0208-1990 mapping for this character in ku/ten form.',
+      ],
+      'kJis1' => [
+        'type' => 'float',
+        'description' => 'The JIS X 0212-1990 mapping for this character in ku/ten form.',
+      ],
+      'kKangXi' => [
+        'type' => 'float',
+        'description' => 'The position of this character in the KangXi dictionary used in the four-dictionary sorting algorithm.',
+      ],
+      'kKarlgren' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The index of this character in _Analytic Dictionary of Chinese and Sino-Japanese_ by Bernhard Karlgren, New York: Dover Publications, Inc., 1974.',
+      ],
+      'kKorean' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The Korean pronunciation(s) of this character, using the Yale romanization system.',
+      ],
+      'kKPS0' => [
+        'type' => 'int',
+        'description' => 'The KP 9566-97 mapping for this character in hexadecimal form.',
+      ],
+      'kKPS1' => [
+        'type' => 'int',
+        'description' => 'The KPS 10721-2000 mapping for this character in hexadecimal form.',
+      ],
+      'kKSC0' => [
+        'type' => 'float',
+        'description' => 'The KS X 1001:1992 (KS C 5601-1989) mapping for this character in ku/ten form.',
+      ],
+      'kKSC1' => [
+        'type' => 'float',
+        'description' => 'The KS X 1002:1991 (KS C 5657-1991) mapping for this character in ku/ten form.',
+      ],
+      'kLau' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The index of this character in _A Practical Cantonese-English Dictionary_ by Sidney Lau, Hong Kong: The Government Printer, 1977.',
+      ],
+      'kMainlandTelegraph' => [
+        'type' => 'float',
+        'description' => 'The PRC telegraph code for this character.',
+      ],
+      'kMandarin' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The Mandarin pronunciation(s) for this character in pinyin; Mandarin pronunciations are sorted in order of frequency, not alphabetically',
+      ],
+      'kMatthews' => [
+        'type' => 'float',
+        'description' => 'The index of this character in _Mathews\' Chinese-English Dictionary_ by Robert H. Mathews, Cambrige: Harvard University Press, 1975.',
+      ],
+      'kMeyerWempe' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The index of this character in the _Student\'s Cantonese-English Dictionary_ by Bernard F. Meyer and Theodore F. Wempe (3rd edition, 1947).',
+      ],
+      'kMorohashi' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The index of this character in the Dae Kanwa Ziten, aka Morohashi dictionary (Japanese) used in the four-dictionary sorting algorithm.',
+      ],
+      'kNelson' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The index of this character in _The Modern Reader\'s Japanese-English Character Dictionary_ by Andrew Nathaniel Nelson, Rutland, Vermont: Charles E. Tuttle Company, 1974.',
+      ],
+      'kOtherNumeric' => [
+        'type' => 'float',
+        'description' => 'The numeric value for the character in certain unusual, specialized contexts.',
+      ],
+      'kPhonetic' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The phonetic index for the character from _Ten Thousand Characters: An Analytic Dictionary_ by G. Hugh Casey, S.J. Hong Kong: Kelley and Walsh, 1980.',
+      ],
+      'kPrimaryNumeric' => [
+        'type' => 'float',
+        'description' => 'The value of the character when used in the writing of numbers in the standard fashion.',
+      ],
+      'kPseudoGB1' => [
+        'type' => 'float',
+        'description' => 'A "GB 12345-90" code point assigned this character for the purposes of including it within Unihan.',
+      ],
+      'kRSJapanese' => [
+        'type' => 'float',
+        'description' => 'A Japanese radical/stroke count for this character.',
+      ],
+      'kRSKangXi' => [
+        'type' => 'float',
+        'description' => 'A KangXi radical/stroke count for this character.',
+      ],
+      'kRSKanWa' => [
+        'type' => 'float',
+        'description' => 'A Morohashi radical/stroke count for this character.',
+      ],
+      'kRSKorean' => [
+        'type' => 'float',
+        'description' => 'A Korean radical/stroke count for this character.',
+      ],
+      'kRSUnicode' => [
+        'type' => 'float',
+        'description' => 'A standard radical/stroke count for this character',
+      ],
+      'kSBGY' => [
+        'type' => 'float',
+        'description' => 'The position of this character in the Song Ben Guang Yun (SBGY) Medieval Chinese character dictionary',
+      ],
+      'kSemanticVariant' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The Unicode value for a semantic variant for this character.',
+      ],
+      'kSimplifiedVariant' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The Unicode value for the simplified Chinese variant for this character (if any).',
+      ],
+      'kSpecializedSemanticVariant' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The Unicode value for a specialized semantic variant for this character.',
+      ],
+      'kTaiwanTelegraph' => [
+        'type' => 'float',
+        'description' => 'The Taiwanese telegraph code for this character.',
+      ],
+      'kTang' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The Tang dynasty pronunciation(s) of this character, derived from _T\'ang Poetic Vocabulary_ by Hugh M. Stimson, Far Eastern Publications, Yale Univ. 1976.',
+      ],
+      'kTotalStrokes' => [
+        'type' => 'float',
+        'description' => 'The total number of strokes in the character (including the radical).',
+      ],
+      'kTraditionalVariant' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The Unicode value(s) for the traditional Chinese variant(s) for this character.',
+      ],
+      'kVietnamese' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'The character\'s pronunciation(s) in Quốc ngữ',
+      ],
+      'kXerox' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The Xerox code for this character',
+      ],
+      'kZVariant' => [
+        'type' => 'varchar',
+        'length' => 32,
+        'description' => 'The Unicode value(s) for known z-variants of this character',
+      ],
+      'kRSAdobe_Japan1_6' => [
+        'type' => 'varchar',
+        'length' => 255,
+        'description' => 'Information on the glyphs in Adobe-Japan1-6 as contributed by Adobe.',
+      ],
+      'kIICore' => [
+        'type' => 'float',
+        'description' => 'Indicates that a character is in IICore, the IRG-produced minimal set of required ideographs for East Asian use.',
+      ],
+      'kFennIndex' => [
+        'type' => 'float',
+        'description' => 'The position of this character in _Fenn\'s Chinese-English Pocket Dictionary_',
+      ],
     ],
     'primary key' => ['code'],
   ];
   return $schema;
 }
 
-function x_unihan_install() {
-  drupal_install_schema('unihan');
+/**
+ * Implements hook_uninstall().
+ */
+function unihan_uninstall() {
+  variable_del('unihan_imported');
 }
 
-function x_unihan_uninstall() {
-  drupal_uninstall_schema('unihan');
-  variable_del('unihan_imported');
+/**
+ * Create the {unihan} table if missing and record existing imported data.
+ */
+function unihan_update_7000() {
+  if (!db_table_exists('unihan')) {
+    db_create_table('unihan', drupal_get_schema_unprocessed('unihan', 'unihan'));
+    return t('Created the {unihan} table.');
+  }
+  if (db_query('SELECT 1 FROM {unihan} LIMIT 1')->fetchField()) {
+    variable_set('unihan_imported', TRUE);
+    return t('Existing Unihan data found; marked as imported.');
+  }
 }
