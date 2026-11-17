@@ -1,0 +1,7 @@
+# Unihan data file: download separately into sites/all/libraries/unihan/
+unihan.txt
+
+# Eclipse PDT project files
+.project
+.buildpath
+.settings/
