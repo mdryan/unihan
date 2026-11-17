@@ -36,6 +36,18 @@ function unihan_demo_pinyin($form, &$form_state) {
   $form['convert'] = [
     '#type' => 'textfield',
     '#title' => t('Chinese characters'),
+    '#required' => TRUE,
+  ];
+  $form['context'] = [
+    '#type' => 'radios',
+    '#title' => t('Convert as'),
+    '#options' => [
+      '' => t('Text'),
+      'surname' => t('Family name'),
+      'given' => t('Given name'),
+    ],
+    '#default_value' => '',
+    '#description' => t('Family and given names use the name readings of characters where these differ, e.g. 曾 is read zēng as a family name.'),
   ];
   $form['submit'] = ['#type' => 'submit', '#value' => t('Convert')];
   if (!empty($form_state['storage']['rows'])) {
@@ -52,9 +64,10 @@ function unihan_demo_pinyin($form, &$form_state) {
  */
 function unihan_demo_pinyin_submit($form, &$form_state) {
   $convert = $form_state['values']['convert'];
+  $context = $form_state['values']['context'] ? $form_state['values']['context'] : NULL;
   $rows = [];
   foreach ([TRUE => t('With tone marks'), FALSE => t('Without tone marks')] as $tone_marks => $label) {
-    $result = unihan_word2pinyin($convert, (bool) $tone_marks);
+    $result = unihan_word2pinyin($convert, (bool) $tone_marks, $context);
     $rows[] = [$label, check_plain($result['pinyin'])];
   }
   $form_state['storage']['rows'] = $rows;

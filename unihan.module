@@ -48,20 +48,61 @@ function unihan_convert_raw($code) {
  *   through unchanged.
  * @param bool $tone_marks
  *   Whether to include tone marks in the pinyin.
+ * @param string|null $context
+ *   Use 'surname' if the string is a family name, 'given' if it is a given
+ *   name, or NULL for other text. In a name, readings from the
+ *   {unihan_surname} or {unihan_given} table are used in preference to the
+ *   most common reading of each character (e.g. 曾 is read zēng rather than
+ *   céng as a surname), and neutral tone readings are not used.
  *
  * @return array
  *   An array whose 'pinyin' element holds the converted string, with its first
  *   letter capitalised.
  */
-function unihan_word2pinyin($str, $tone_marks = TRUE) {
+function unihan_word2pinyin($str, $tone_marks = TRUE, $context = NULL) {
+  $names = $context ? unihan_name_readings($context) : [];
+  // Neutral tones don't occur in names.
+  $skip_neutral_tones = in_array($context, ['surname', 'given'], TRUE);
+  $max_length = $names ? max(array_map('drupal_strlen', array_keys($names))) : 0;
   $pinyin = '';
   $len = drupal_strlen($str);
-  for ($i = 0; $i < $len; $i++) {
+  $i = 0;
+  while ($i < $len) {
+    // Match the longest name in the table first, e.g. 欧阳 before 欧.
+    for ($length = min($max_length, $len - $i); $length > 0; $length--) {
+      $part = drupal_substr($str, $i, $length);
+      if (isset($names[$part])) {
+        foreach (explode(' ', $names[$part]) as $syllable) {
+          $pinyin .= unihan_syllable2pinyin($syllable, $tone_marks);
+        }
+        $i += $length;
+        continue 2;
+      }
+    }
     $char = drupal_substr($str, $i, 1);
-    $ret = unihan_char2pinyin($char, $tone_marks);
+    $ret = unihan_char2pinyin($char, $tone_marks, $skip_neutral_tones);
     $pinyin .= $ret ? $ret : $char;
+    $i++;
   }
   return ['pinyin' => drupal_ucfirst($pinyin)];
+}
+
+/**
+ * Returns the readings of names used in a given context.
+ *
+ * @param string $context
+ *   Either 'surname' for family names or 'given' for given names.
+ *
+ * @return array
+ *   Space separated numbered pinyin (e.g. 'ou1 yang2'), keyed by name.
+ */
+function unihan_name_readings($context) {
+  $readings = &drupal_static(__FUNCTION__, []);
+  if (!isset($readings[$context])) {
+    $tables = ['surname' => 'unihan_surname', 'given' => 'unihan_given'];
+    $readings[$context] = isset($tables[$context]) ? db_query('SELECT name, pinyin FROM {' . $tables[$context] . '}')->fetchAllKeyed() : [];
+  }
+  return $readings[$context];
 }
 
 /**
@@ -71,26 +112,58 @@ function unihan_word2pinyin($str, $tone_marks = TRUE) {
  *   The character to convert.
  * @param bool $tone_marks
  *   Whether to include tone marks in the pinyin.
+ * @param bool $skip_neutral_tones
+ *   Whether to skip neutral tone readings (e.g. 卜 bo in 萝卜, 儿 as the r
+ *   suffix) in favour of the most common reading with a tone, as in names.
  *
  * @return string|null
  *   The most common pinyin reading of the character, or NULL if the character
  *   has no Mandarin reading in the Unihan database.
  */
-function unihan_char2pinyin($char, $tone_marks) {
+function unihan_char2pinyin($char, $tone_marks, $skip_neutral_tones = FALSE) {
   $result = db_query('SELECT kMandarin, kHanyuPinLu FROM {unihan} WHERE code = :code', [
     ':code' => $char,
   ])->fetchObject();
   if (!$result || (is_null($result->kMandarin) && empty($result->kHanyuPinLu))) {
     return NULL;
   }
+  // Readings in order of preference: by frequency of use (kHanyuPinlu, e.g.
+  // "dou1(5680) du1(93)"), then in the order given in kMandarin.
+  $readings = [];
   if (!empty($result->kHanyuPinLu)) {
-    list($pinlu) = explode(' ', $result->kHanyuPinLu, 2);
-    list($pinyin) = explode('(', $pinlu, 2);
+    foreach (explode(' ', $result->kHanyuPinLu) as $pinlu) {
+      list($readings[]) = explode('(', $pinlu, 2);
+    }
   }
-  else {
-    // Only consider most popular romanisation.
-    list($pinyin) = explode(' ', $result->kMandarin, 2);
+  if (!is_null($result->kMandarin)) {
+    $readings = array_merge($readings, explode(' ', $result->kMandarin));
   }
+  $syllable = reset($readings);
+  if ($skip_neutral_tones) {
+    foreach ($readings as $reading) {
+      if (preg_match('/[aeiouü].*[1-4]$/iu', $reading)) {
+        $syllable = $reading;
+        break;
+      }
+    }
+  }
+  return unihan_syllable2pinyin($syllable, $tone_marks);
+}
+
+/**
+ * Converts a pinyin syllable with a tone number to pinyin.
+ *
+ * @param string $syllable
+ *   Pinyin with a tone number from 1 to 5, in upper or lower case, e.g. LÜ3 or
+ *   zeng1.
+ * @param bool $tone_marks
+ *   Whether to include a tone mark. Without one, ü is written as yu (see
+ *   unihan_strip_tonemarks()).
+ *
+ * @return string
+ *   The syllable in lower case, e.g. lǚ or zēng.
+ */
+function unihan_syllable2pinyin($syllable, $tone_marks) {
   $translate = [
     'a' => [1 => 'ā', 2 => 'á', 3 => 'ǎ', 4 => 'à', 5 => 'a'],
     'e' => [1 => 'ē', 2 => 'é', 3 => 'ě', 4 => 'è', 5 => 'e'],
@@ -99,9 +172,10 @@ function unihan_char2pinyin($char, $tone_marks) {
     'u' => [1 => 'ū', 2 => 'ú', 3 => 'ǔ', 4 => 'ù', 5 => 'u'],
     'ü' => [1 => 'ǖ', 2 => 'ǘ', 3 => 'ǚ', 4 => 'ǜ', 5 => 'ü'],
   ];
-  // The data is in upper case (e.g. LÜ3), so lower case it multibyte-safely.
-  $tone = substr($pinyin, -1);
-  $pinyin = drupal_strtolower(substr($pinyin, 0, -1));
+  // Unihan data is in upper case (e.g. LÜ3), so lower case it
+  // multibyte-safely.
+  $tone = substr($syllable, -1);
+  $pinyin = drupal_strtolower(substr($syllable, 0, -1));
   if (!$tone_marks) {
     return unihan_strip_tonemarks($pinyin);
   }

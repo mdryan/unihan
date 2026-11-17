@@ -419,7 +419,33 @@ function unihan_schema() {
     ],
     'primary key' => ['code'],
   ];
+  $name_table = [
+    'fields' => [
+      'name' => [
+        'type' => 'varchar',
+        'length' => 8,
+        'not null' => TRUE,
+        'description' => 'One or more Chinese characters.',
+      ],
+      'pinyin' => [
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'description' => 'Space separated numbered pinyin, one syllable for each character, e.g. ou1 yang2.',
+      ],
+    ],
+    'primary key' => ['name'],
+  ];
+  $schema['unihan_surname'] = ['description' => 'Readings of Chinese characters used as family names, e.g. 曾 zeng1, including compound surnames such as 欧阳.'] + $name_table;
+  $schema['unihan_given'] = ['description' => 'Readings of Chinese characters used in given names, where they differ from the usual reading, e.g. 娜 na4.'] + $name_table;
   return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function unihan_install() {
+  _unihan_populate_name_tables();
 }
 
 /**
@@ -441,4 +467,167 @@ function unihan_update_7000() {
     variable_set('unihan_imported', TRUE);
     return t('Existing Unihan data found; marked as imported.');
   }
+}
+
+/**
+ * Add and populate the {unihan_surname} and {unihan_given} tables.
+ */
+function unihan_update_7001() {
+  $name_table = [
+    'fields' => [
+      'name' => [
+        'type' => 'varchar',
+        'length' => 8,
+        'not null' => TRUE,
+        'description' => 'One or more Chinese characters.',
+      ],
+      'pinyin' => [
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'description' => 'Space separated numbered pinyin, one syllable for each character, e.g. ou1 yang2.',
+      ],
+    ],
+    'primary key' => ['name'],
+  ];
+  if (!db_table_exists('unihan_surname')) {
+    db_create_table('unihan_surname', ['description' => 'Readings of Chinese characters used as family names, e.g. 曾 zeng1, including compound surnames such as 欧阳.'] + $name_table);
+  }
+  if (!db_table_exists('unihan_given')) {
+    db_create_table('unihan_given', ['description' => 'Readings of Chinese characters used in given names, where they differ from the usual reading, e.g. 娜 na4.'] + $name_table);
+  }
+  $counts = _unihan_populate_name_tables();
+  return t('Added @surnames surname readings and @given given name readings.', [
+    '@surnames' => $counts['unihan_surname'],
+    '@given' => $counts['unihan_given'],
+  ]);
+}
+
+/**
+ * Adds the default name readings, replacing any existing reading of a name.
+ *
+ * @return array
+ *   The number of readings added to each table, keyed by table name.
+ */
+function _unihan_populate_name_tables() {
+  $counts = [];
+  foreach (_unihan_default_name_readings() as $table => $readings) {
+    foreach ($readings as $name => $pinyin) {
+      db_merge($table)
+        ->key(['name' => $name])
+        ->fields(['pinyin' => $pinyin])
+        ->execute();
+    }
+    $counts[$table] = count($readings);
+  }
+  return $counts;
+}
+
+/**
+ * Returns the default name readings.
+ *
+ * Only names whose reading differs from the most common reading of their
+ * characters need to be listed, plus compound surnames so that they are
+ * matched as a whole. Readings follow the Xiandai Hanyu Cidian.
+ *
+ * @return array
+ *   Numbered pinyin keyed by name, keyed by table name.
+ */
+function _unihan_default_name_readings() {
+  return [
+    'unihan_surname' => [
+      // Single surnames.
+      '秘' => 'bi4',
+      '卜' => 'bu3',
+      '长' => 'chang2',
+      '朝' => 'chao2',
+      '谌' => 'chen2',
+      '种' => 'chong2',
+      '都' => 'du1',
+      '盖' => 'ge3',
+      '葛' => 'ge3',
+      '句' => 'gou1',
+      '过' => 'guo1',
+      '华' => 'hua4',
+      '阚' => 'kan4',
+      '缪' => 'miao4',
+      '能' => 'nai4',
+      '区' => 'ou1',
+      '逄' => 'pang2',
+      '朴' => 'piao2',
+      '繁' => 'po2',
+      '覃' => 'qin2',
+      '仇' => 'qiu2',
+      '任' => 'ren2',
+      '单' => 'shan4',
+      '召' => 'shao4',
+      '折' => 'she2',
+      '莘' => 'shen1',
+      '沈' => 'shen3',
+      '隗' => 'wei3',
+      '尉' => 'wei4',
+      '相' => 'xiang4',
+      '解' => 'xie4',
+      '薛' => 'xue1',
+      '乐' => 'yue4',
+      '员' => 'yun4',
+      '曾' => 'zeng1',
+      '查' => 'zha1',
+      '翟' => 'zhai2',
+      // Compound surnames.
+      '百里' => 'bai3 li3',
+      '单于' => 'chan2 yu2',
+      '第五' => 'di4 wu3',
+      '东方' => 'dong1 fang1',
+      '端木' => 'duan1 mu4',
+      '公孙' => 'gong1 sun1',
+      '赫连' => 'he4 lian2',
+      '呼延' => 'hu1 yan2',
+      '皇甫' => 'huang2 fu3',
+      '令狐' => 'ling2 hu2',
+      '万俟' => 'mo4 qi2',
+      '慕容' => 'mu4 rong2',
+      '南宫' => 'nan2 gong1',
+      '欧阳' => 'ou1 yang2',
+      '濮阳' => 'pu2 yang2',
+      '上官' => 'shang4 guan1',
+      '申屠' => 'shen1 tu2',
+      '司马' => 'si1 ma3',
+      '司徒' => 'si1 tu2',
+      '太史' => 'tai4 shi3',
+      '澹台' => 'tan2 tai2',
+      '拓跋' => 'tuo4 ba2',
+      '闻人' => 'wen2 ren2',
+      '西门' => 'xi1 men2',
+      '夏侯' => 'xia4 hou2',
+      '轩辕' => 'xuan1 yuan2',
+      '宇文' => 'yu3 wen2',
+      '尉迟' => 'yu4 chi2',
+      '长孙' => 'zhang3 sun1',
+      '钟离' => 'zhong1 li2',
+      '诸葛' => 'zhu1 ge3',
+    ],
+    'unihan_given' => [
+      '薄' => 'bo2',
+      '泊' => 'bo2',
+      '孛' => 'bo2',
+      '长' => 'chang2',
+      '浣' => 'huan4',
+      '珲' => 'hui1',
+      '娜' => 'na4',
+      '锘' => 'nuo4',
+      '莆' => 'pu2',
+      '玘' => 'qi3',
+      '乾' => 'qian2',
+      '湫' => 'qiu1',
+      '晟' => 'sheng4',
+      '锶' => 'si1',
+      '伺' => 'si4',
+      '焘' => 'tao1',
+      '粞' => 'xi1',
+      '垭' => 'ya4',
+      '昳' => 'yi4',
+      '曾' => 'zeng1',
+    ],
+  ];
 }
